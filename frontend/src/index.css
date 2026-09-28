@@ -1,0 +1,19 @@
+/* Gulli Cricket - Root Reset
+   All styling is handled by styles/index.css (the main design system).
+   This file only provides the minimal base reset. */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+}
+
+#root {
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
