@@ -473,7 +473,7 @@ public class ScoringService {
             isAllOut = currentInnings.getWickets() >= Math.max(10, totalBatted - 1);
         }
 
-        boolean isOversComplete = currentInnings.getCompletedOvers() >= maxOvers;
+                boolean isOversComplete = maxOvers > 0 && currentInnings.getCompletedOvers() >= maxOvers;
 
         if (match.getCurrentInnings() == 1) {
             if (isAllOut || isOversComplete) {

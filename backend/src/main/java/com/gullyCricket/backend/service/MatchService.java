@@ -74,8 +74,8 @@ public class MatchService {
         if (dto.getTeamA().trim().equalsIgnoreCase(dto.getTeamB().trim())) {
             throw new BadRequestException("Team A and Team B cannot have the same name");
         }
-        if (dto.getTotalOvers() <= 0) {
-            throw new BadRequestException("Total overs must be greater than 0");
+            if (dto.getTotalOvers() < 0) {
+            throw new BadRequestException("Total overs must be non-negative");
         }
 
         Match match = new Match(

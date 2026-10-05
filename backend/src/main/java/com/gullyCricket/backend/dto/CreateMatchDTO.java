@@ -15,7 +15,7 @@ public class CreateMatchDTO {
     private String teamBId;
 
     @NotNull(message = "Number of overs is required")
-    @Min(value = 1, message = "Overs must be at least 1")
+    @Min(value = 0, message = "Overs must be at least 0 (0 for Test Match)")
     private Integer totalOvers;
 
     @NotBlank(message = "Match date is required")

@@ -500,9 +500,9 @@ const LiveScoring = () => {
   const isChasing = match.currentInnings === 2;
   const target = currentInnings?.targetRuns;
   const requiredRuns = target ? target - (currentInnings?.totalRuns || 0) : 0;
-  const totalMaxBalls = match.totalOvers * 6;
+  const totalMaxBalls = match.totalOvers > 0 ? match.totalOvers * 6 : Infinity;
   const currentBallsBowled = (currentInnings?.completedOvers || 0) * 6 + (currentInnings?.ballsInCurrentOver || 0);
-  const remainingBalls = Math.max(0, totalMaxBalls - currentBallsBowled);
+  const remainingBalls = match.totalOvers > 0 ? Math.max(0, totalMaxBalls - currentBallsBowled) : null;
 
   return (
     <div style={{ maxWidth: '1080px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>

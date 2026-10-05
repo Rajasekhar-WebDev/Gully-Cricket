@@ -97,10 +97,17 @@ const CreateMatch = () => {
       return;
     }
 
-    if (!totalOvers || Number(totalOvers) <= 0) {
-      setError('Number of overs must be at least 1.');
-      return;
+    // Ensure overs selection is defined (allow 0 for Test Match)
+    if (totalOvers === '' || totalOvers === null || totalOvers === undefined) {
+        setError('Number of overs must be selected.');
+        return;
     }
+    if (Number(totalOvers) < 0) {
+        setError('Number of overs cannot be negative.');
+        return;
+    }
+    // Zero overs (Test Match) is allowed; no further validation needed
+
 
     if (!matchDate.trim()) {
       setError('Match date is required.');
@@ -278,6 +285,7 @@ const CreateMatch = () => {
                 <option value={12}>12 Overs</option>
                 <option value={15}>15 Overs</option>
                 <option value={20}>20 Overs (T20 Pro)</option>
+                <option value={0}>Test Match (no overs limit)</option>
               </select>
             </div>
 

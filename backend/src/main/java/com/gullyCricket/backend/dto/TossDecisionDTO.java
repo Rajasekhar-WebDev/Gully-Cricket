@@ -7,10 +7,10 @@ public class TossDecisionDTO {
     private String tossCall; // HEADS or TAILS
     private String coinResult; // HEADS or TAILS
 
-    @NotBlank(message = "Toss winner is required")
+
     private String tossWinner;
 
-    @NotBlank(message = "Toss decision is required (BAT or BOWL)")
+
     private String tossDecision; // BAT or BOWL
 
     public TossDecisionDTO() {}
