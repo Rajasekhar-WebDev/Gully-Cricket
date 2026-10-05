@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const getApiBaseUrl = () => {
-  let url = (import.meta.env.VITE_API_URL || 'http://localhost:8086/api').trim();
+  let url = (import.meta.env.VITE_API_URL || 'https://gully-cricket-backend-du5l.onrender.com/api').trim();
   url = url.replace(/\/+$/, '');
   if (!url.endsWith('/api')) {
     url = `${url}/api`;
