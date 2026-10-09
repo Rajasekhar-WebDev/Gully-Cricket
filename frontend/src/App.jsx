@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, NavLink } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { SoundProvider } from './context/SoundContext';
+import { warmupApi } from './services/api';
 import { LayoutDashboard, Trophy, Users, PlusCircle, Shield } from 'lucide-react';
 
 import Navbar from './components/common/Navbar';
@@ -103,6 +104,10 @@ const LayoutShell = ({ children }) => {
 };
 
 function App() {
+  useEffect(() => {
+    warmupApi.ping();
+  }, []);
+
   return (
     <AuthProvider>
       <SoundProvider>

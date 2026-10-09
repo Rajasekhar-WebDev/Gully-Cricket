@@ -37,9 +37,11 @@ public class MatchService {
         this.userRepository = userRepository;
     }
 
+    private final java.util.Map<String, String> userCache = new java.util.concurrent.ConcurrentHashMap<>();
+
     public List<Match> getAllMatches() {
         List<Match> matches = matchRepository.findAllByOrderByCreatedAtDesc();
-        matches.forEach(this::enrichMatchCreatorName);
+        enrichMatchCreatorNames(matches);
         return matches;
     }
 
@@ -56,17 +58,44 @@ public class MatchService {
             matches = getAllMatches();
         } else {
             matches = matchRepository.findByStatusOrderByCreatedAtDesc(status.toUpperCase());
-            matches.forEach(this::enrichMatchCreatorName);
+            enrichMatchCreatorNames(matches);
         }
         return matches;
     }
 
+    private void enrichMatchCreatorNames(List<Match> matches) {
+        if (matches == null || matches.isEmpty()) return;
+        List<String> missingIds = matches.stream()
+                .filter(m -> m.getCreatedBy() != null && (m.getCreatedByName() == null || m.getCreatedByName().isBlank()))
+                .map(Match::getCreatedBy)
+                .filter(id -> !userCache.containsKey(id))
+                .distinct()
+                .toList();
+
+        if (!missingIds.isEmpty()) {
+            userRepository.findAllById(missingIds).forEach(user -> {
+                String name = user.getFullName() != null && !user.getFullName().isBlank() ? user.getFullName() : user.getUsername();
+                userCache.put(user.getId(), name);
+            });
+        }
+
+        for (Match match : matches) {
+            enrichMatchCreatorName(match);
+        }
+    }
+
     private void enrichMatchCreatorName(Match match) {
         if (match != null && match.getCreatedBy() != null && (match.getCreatedByName() == null || match.getCreatedByName().isBlank())) {
-            userRepository.findById(match.getCreatedBy()).ifPresent(user -> {
-                String name = user.getFullName() != null && !user.getFullName().isBlank() ? user.getFullName() : user.getUsername();
-                match.setCreatedByName(name);
-            });
+            String cached = userCache.get(match.getCreatedBy());
+            if (cached != null) {
+                match.setCreatedByName(cached);
+            } else {
+                userRepository.findById(match.getCreatedBy()).ifPresent(user -> {
+                    String name = user.getFullName() != null && !user.getFullName().isBlank() ? user.getFullName() : user.getUsername();
+                    userCache.put(user.getId(), name);
+                    match.setCreatedByName(name);
+                });
+            }
         }
     }
 

@@ -1,14 +1,22 @@
 package com.gullyCricket.backend.model;
 
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.index.CompoundIndexes;
+import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
 
 @Document(collection = "balls")
+@CompoundIndexes({
+    @CompoundIndex(name = "match_innings_timestamp_idx", def = "{'matchId': 1, 'inningsNumber': 1, 'timestamp': 1}"),
+    @CompoundIndex(name = "match_timestamp_idx", def = "{'matchId': 1, 'timestamp': 1}")
+})
 public class BallDelivery {
     @Id
     private String id;
+    @Indexed
     private String matchId;
     private int inningsNumber;
     private int overNumber; // 1-based

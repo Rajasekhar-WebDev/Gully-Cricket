@@ -1,6 +1,7 @@
 package com.gullyCricket.backend.model;
 
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
@@ -10,15 +11,19 @@ public class Player {
     @Id
     private String id;
     private String name;
+    @Indexed
     private String teamId;
+    @Indexed
     private String teamName;
     private String role; // "BATSMAN", "BOWLER", "ALL_ROUNDER", "WICKET_KEEPER"
     private int matches = 0;
+    @Indexed
     private int runs = 0;
     private int ballsFaced = 0;
     private int highestScore = 0;
     private int fours = 0;
     private int sixes = 0;
+    @Indexed
     private int wickets = 0;
     private double oversBowled = 0.0;
     private int runsConceded = 0;

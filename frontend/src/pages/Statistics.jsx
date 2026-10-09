@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { statsApi } from '../services/api';
+import { fastCache } from '../services/fastCache';
 import { useSound } from '../context/SoundContext';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import ErrorAlert from '../components/common/ErrorAlert';
 import { Trophy, Award, Flame, Zap, TrendingUp, Shield } from 'lucide-react';
 
 const Statistics = () => {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const cached = fastCache.get('gulli_leaderboard_cache', null);
+  const [data, setData] = useState(cached);
+  const [loading, setLoading] = useState(!cached);
   const [error, setError] = useState('');
   const [activeCap, setActiveCap] = useState('orange'); // orange or purple
 
@@ -16,11 +18,14 @@ const Statistics = () => {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        setLoading(true);
+        if (!cached) setLoading(true);
         const res = await statsApi.getLeaderboard();
+        fastCache.set('gulli_leaderboard_cache', res);
         setData(res);
       } catch (err) {
-        setError('Failed to load leaderboards: ' + err.message);
+        if (!data) {
+          setError('Failed to load leaderboards: ' + err.message);
+        }
       } finally {
         setLoading(false);
       }
@@ -28,7 +33,7 @@ const Statistics = () => {
     fetchStats();
   }, []);
 
-  if (loading) {
+  if (loading && !data) {
     return <LoadingSpinner message="Calculating player leaderboards & caps..." />;
   }
 

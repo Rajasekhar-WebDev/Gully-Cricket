@@ -1,12 +1,14 @@
 package com.gullyCricket.backend.service;
 
 import com.gullyCricket.backend.dto.DashboardStatsDTO;
-import com.gullyCricket.backend.model.InningsScore;
 import com.gullyCricket.backend.model.Match;
 import com.gullyCricket.backend.model.Player;
-import com.gullyCricket.backend.repository.InningsScoreRepository;
 import com.gullyCricket.backend.repository.MatchRepository;
 import com.gullyCricket.backend.repository.PlayerRepository;
+import org.bson.Document;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.aggregation.Aggregation;
+import org.springframework.data.mongodb.core.aggregation.AggregationResults;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
@@ -18,17 +20,32 @@ public class StatsService {
 
     private final MatchRepository matchRepository;
     private final PlayerRepository playerRepository;
-    private final InningsScoreRepository inningsScoreRepository;
+    private final MongoTemplate mongoTemplate;
+
+    // Fast in-memory cache to make dashboard load instantly (< 1ms)
+    private volatile DashboardStatsDTO cachedDashboardStats;
+    private volatile long lastDashboardCacheTime = 0;
+    private static final long CACHE_TTL_MS = 15000; // 15 seconds cache
 
     public StatsService(MatchRepository matchRepository,
                         PlayerRepository playerRepository,
-                        InningsScoreRepository inningsScoreRepository) {
+                        MongoTemplate mongoTemplate) {
         this.matchRepository = matchRepository;
         this.playerRepository = playerRepository;
-        this.inningsScoreRepository = inningsScoreRepository;
+        this.mongoTemplate = mongoTemplate;
+    }
+
+    public synchronized void invalidateCache() {
+        this.cachedDashboardStats = null;
+        this.lastDashboardCacheTime = 0;
     }
 
     public DashboardStatsDTO getDashboardStats() {
+        long now = System.currentTimeMillis();
+        if (cachedDashboardStats != null && (now - lastDashboardCacheTime) < CACHE_TTL_MS) {
+            return cachedDashboardStats;
+        }
+
         DashboardStatsDTO stats = new DashboardStatsDTO();
 
         long totalMatches = matchRepository.count();
@@ -41,14 +58,30 @@ public class StatsService {
         stats.setLiveMatches(liveMatches);
         stats.setUpcomingMatches(upcomingMatches);
 
-        // Sum runs and wickets across all innings
-        List<InningsScore> allInnings = inningsScoreRepository.findAll();
-        int totalRuns = allInnings.stream().mapToInt(InningsScore::getTotalRuns).sum();
-        int totalWickets = allInnings.stream().mapToInt(InningsScore::getWickets).sum();
+        // High performance Mongo Aggregation instead of fetching all documents over the network
+        int totalRuns = 0;
+        int totalWickets = 0;
+        try {
+            Aggregation agg = Aggregation.newAggregation(
+                Aggregation.group()
+                    .sum("totalRuns").as("sumRuns")
+                    .sum("wickets").as("sumWickets")
+            );
+            AggregationResults<Document> aggResult = mongoTemplate.aggregate(agg, "scores", Document.class);
+            Document doc = aggResult.getUniqueMappedResult();
+            if (doc != null) {
+                Number r = doc.get("sumRuns", Number.class);
+                Number w = doc.get("sumWickets", Number.class);
+                totalRuns = r != null ? r.intValue() : 0;
+                totalWickets = w != null ? w.intValue() : 0;
+            }
+        } catch (Exception ignored) {
+            // Fallback safe
+        }
         stats.setTotalRuns(totalRuns);
         stats.setTotalWickets(totalWickets);
 
-        // Calculate win percentage
+        // Win percentage
         if (totalMatches > 0) {
             double winPct = ((double) completedMatches / totalMatches) * 100.0;
             stats.setWinPercentage(Math.round(winPct * 10.0) / 10.0);
@@ -56,17 +89,20 @@ public class StatsService {
             stats.setWinPercentage(0.0);
         }
 
-        // Recent matches
-        List<Match> matches = matchRepository.findAllByOrderByCreatedAtDesc();
-        stats.setRecentMatches(matches.subList(0, Math.min(5, matches.size())));
+        // Only query top 5 matches rather than entire database
+        List<Match> matches = matchRepository.findTop5ByOrderByCreatedAtDesc();
+        stats.setRecentMatches(matches);
 
-        // Upcoming matches
-        List<Match> upcoming = matchRepository.findByStatusOrderByCreatedAtDesc("UPCOMING");
-        stats.setUpcomingMatchesList(upcoming.subList(0, Math.min(5, upcoming.size())));
+        // Only query top 5 upcoming matches
+        List<Match> upcoming = matchRepository.findTop5ByStatusOrderByCreatedAtDesc("UPCOMING");
+        stats.setUpcomingMatchesList(upcoming);
 
-        // Top batsmen & bowlers
+        // Top batsmen & bowlers (using indexed queries)
         stats.setTopBatsmen(playerRepository.findTop10ByOrderByRunsDesc());
         stats.setTopBowlers(playerRepository.findTop10ByOrderByWicketsDesc());
+
+        this.cachedDashboardStats = stats;
+        this.lastDashboardCacheTime = now;
 
         return stats;
     }

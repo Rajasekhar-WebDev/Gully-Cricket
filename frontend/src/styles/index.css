@@ -1107,3 +1107,54 @@ input:focus, select:focus, textarea:focus {
     font-size: 16px !important;
   }
 }
+
+/* ==========================================================================
+   Skeleton & Fast-Load States
+   ========================================================================== */
+
+@keyframes skeletonPulse {
+  0% {
+    background-color: rgba(30, 41, 59, 0.4);
+    opacity: 0.6;
+  }
+  50% {
+    background-color: rgba(51, 65, 85, 0.7);
+    opacity: 0.9;
+  }
+  100% {
+    background-color: rgba(30, 41, 59, 0.4);
+    opacity: 0.6;
+  }
+}
+
+.skeleton-box {
+  animation: skeletonPulse 1.6s ease-in-out infinite;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.telemetry-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: rgba(16, 185, 129, 0.12);
+  color: var(--primary);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.telemetry-warming-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: var(--radius-md);
+  font-size: 0.82rem;
+  background: rgba(245, 158, 11, 0.12);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  animation: pulseWicket 2s infinite;
+}

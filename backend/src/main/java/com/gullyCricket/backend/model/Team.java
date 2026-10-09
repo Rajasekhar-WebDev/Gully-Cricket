@@ -1,6 +1,7 @@
 package com.gullyCricket.backend.model;
 
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
@@ -11,9 +12,11 @@ import java.util.List;
 public class Team {
     @Id
     private String id;
+    @Indexed
     private String name;
     private String shortCode;
     private String color = "#10B981";
+    @Indexed
     private String ownerId;
     private int matchesPlayed = 0;
     private int matchesWon = 0;

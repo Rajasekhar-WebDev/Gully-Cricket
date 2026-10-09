@@ -13,6 +13,7 @@ const API_BASE_URL = getApiBaseUrl();
 
 const api = axios.create({
   baseURL: API_BASE_URL,
+  timeout: 15000, // 15s timeout to prevent hanging indefinite requests
   headers: {
     'Content-Type': 'application/json',
   },
@@ -103,5 +104,17 @@ export const statsApi = {
   getDashboardStats: () => api.get('/stats/dashboard').then(r => r.data),
   getLeaderboard: () => api.get('/stats/leaderboard').then(r => r.data),
 };
+
+// Health & Server Warmup API
+export const warmupApi = {
+  ping: () => api.get('/health', { timeout: 8000 }).then(r => r.data).catch(() => null),
+};
+
+// Pre-warm backend immediately when app bundle loads
+if (typeof window !== 'undefined') {
+  setTimeout(() => {
+    warmupApi.ping();
+  }, 100);
+}
 
 export default api;

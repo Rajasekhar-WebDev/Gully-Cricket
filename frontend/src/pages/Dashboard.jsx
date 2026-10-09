@@ -1,53 +1,122 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { statsApi, matchApi } from '../services/api';
+import { fastCache } from '../services/fastCache';
 import { useSound } from '../context/SoundContext';
 import MatchCard from '../components/cricket/MatchCard';
-import LoadingSpinner from '../components/common/LoadingSpinner';
 import ErrorAlert from '../components/common/ErrorAlert';
 import ConfirmationModal from '../components/common/ConfirmationModal';
 import { 
   Trophy, 
   Activity, 
   TrendingUp, 
-  Target, 
   PlusCircle, 
   Users, 
-  Play, 
-  Award,
-  Zap,
-  Flame,
-  ArrowRight
+  Zap, 
+  Flame, 
+  ArrowRight,
+  RefreshCw,
+  CheckCircle2,
+  Clock
 } from 'lucide-react';
 
+const DashboardSkeleton = () => (
+  <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+    {/* Skeleton Header */}
+    <div className="skeleton-box" style={{ height: '180px', width: '100%' }} />
+
+    {/* Skeleton Stats Grid */}
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+      gap: '16px'
+    }}>
+      {[1, 2, 3, 4, 5].map((i) => (
+        <div key={i} className="skeleton-box" style={{ height: '110px' }} />
+      ))}
+    </div>
+
+    {/* Skeleton Matches & Performers */}
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '28px' }}>
+      <div className="skeleton-box" style={{ height: '320px' }} />
+      <div className="skeleton-box" style={{ height: '320px' }} />
+    </div>
+  </div>
+);
+
 const Dashboard = () => {
-  const [stats, setStats] = useState(null);
-  const [liveMatches, setLiveMatches] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // SWR: Initialize instantly from fast local cache (0ms instant render)
+  const cachedStats = fastCache.get('gulli_dash_stats', null);
+  const cachedLive = fastCache.get('gulli_live_matches', []);
+
+  const [stats, setStats] = useState(cachedStats);
+  const [liveMatches, setLiveMatches] = useState(cachedLive);
+  const [loading, setLoading] = useState(!cachedStats);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isServerWarming, setIsServerWarming] = useState(false);
   const [error, setError] = useState('');
+  const [lastSyncTime, setLastSyncTime] = useState(cachedStats ? 'Loaded from local cache' : '');
   const [deleteModalMatch, setDeleteModalMatch] = useState(null);
 
+  const warmingTimerRef = useRef(null);
   const { playSound } = useSound();
 
-  const loadData = async () => {
+  const loadData = async (isManual = false) => {
+    if (isManual) {
+      setIsRefreshing(true);
+      playSound('tap');
+    }
+
+    // Set server warming notification if query takes > 2.5 seconds (Render cold start detection)
+    if (!stats) {
+      warmingTimerRef.current = setTimeout(() => {
+        setIsServerWarming(true);
+      }, 2500);
+    }
+
     try {
-      setLoading(true);
       setError('');
       const [dashStats, live] = await Promise.all([
         statsApi.getDashboardStats(),
         matchApi.getAll('LIVE'),
       ]);
+
+      // Cache fresh data for instant future loads
+      fastCache.set('gulli_dash_stats', dashStats);
+      fastCache.set('gulli_live_matches', live);
+
       setStats(dashStats);
-      setLiveMatches(live);
+      setLiveMatches(live || []);
+      setLastSyncTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
     } catch (err) {
-      setError('Unable to fetch dashboard statistics. ' + err.message);
+      // If we already have cached stats, don't break the user view; just show warning toast
+      if (!stats) {
+        setError('Unable to fetch live dashboard telemetry: ' + (err.message || 'Server timeout'));
+      }
     } finally {
+      if (warmingTimerRef.current) {
+        clearTimeout(warmingTimerRef.current);
+      }
       setLoading(false);
+      setIsRefreshing(false);
+      setIsServerWarming(false);
     }
   };
 
   useEffect(() => {
     loadData();
+
+    // Auto-refresh in background every 20s if live matches exist
+    const interval = setInterval(() => {
+      if (liveMatches && liveMatches.length > 0) {
+        loadData(false);
+      }
+    }, 20000);
+
+    return () => {
+      clearInterval(interval);
+      if (warmingTimerRef.current) clearTimeout(warmingTimerRef.current);
+    };
   }, []);
 
   const handleDeleteMatch = async () => {
@@ -56,18 +125,37 @@ const Dashboard = () => {
       playSound('tap');
       await matchApi.delete(deleteModalMatch.id);
       setDeleteModalMatch(null);
-      loadData();
+      loadData(false);
     } catch (err) {
       setError('Failed to delete match: ' + err.message);
     }
   };
 
-  if (loading) {
-    return <LoadingSpinner message="Calculating match telemetry & dashboard stats..." />;
+  // Only show full skeleton on first visit with 0 cache
+  if (loading && !stats) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        {isServerWarming && (
+          <div className="telemetry-warming-pill" style={{ justifyContent: 'center' }}>
+            <Clock size={16} />
+            <span>Connecting to cloud backend (waking up server)... Initializing match telemetry...</span>
+          </div>
+        )}
+        <DashboardSkeleton />
+      </div>
+    );
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+      {/* Server Warming Notice Banner */}
+      {isServerWarming && (
+        <div className="telemetry-warming-pill" style={{ justifyContent: 'center' }}>
+          <Clock size={16} />
+          <span>⚡ Cloud server is waking up from idle mode. Loading latest live match telemetry...</span>
+        </div>
+      )}
+
       {/* Welcome Banner / Header */}
       <div style={{
         background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(15, 23, 42, 0.9) 100%)',
@@ -82,10 +170,14 @@ const Dashboard = () => {
         boxShadow: 'var(--shadow-md)'
       }}>
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '1.2rem' }}>⚡</span>
             <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--primary)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
               SMART CRICKET MATCH MANAGEMENT
+            </span>
+            <span className="telemetry-status-pill">
+              <CheckCircle2 size={12} />
+              <span>Instant Telemetry {lastSyncTime ? `• ${lastSyncTime}` : ''}</span>
             </span>
           </div>
           <h1 style={{ fontSize: '2.2rem', fontWeight: 800, marginBottom: '6px' }}>
@@ -96,7 +188,17 @@ const Dashboard = () => {
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '12px' }}>
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => loadData(true)}
+            disabled={isRefreshing}
+            className="btn btn-secondary"
+            title="Refresh latest stats from server"
+            style={{ padding: '12px 16px', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '8px' }}
+          >
+            <RefreshCw size={16} className={isRefreshing ? 'spinner' : ''} />
+            <span>{isRefreshing ? 'Syncing...' : 'Sync'}</span>
+          </button>
           <Link
             to="/match/new"
             className="btn btn-primary"
@@ -118,7 +220,7 @@ const Dashboard = () => {
         </div>
       </div>
 
-      <ErrorAlert message={error} onDismiss={() => setError('')} retry={loadData} />
+      <ErrorAlert message={error} onDismiss={() => setError('')} retry={() => loadData(true)} />
 
       {/* KPI Stats Grid */}
       <div style={{
@@ -193,7 +295,7 @@ const Dashboard = () => {
       </div>
 
       {/* Live Matches Section (if any live) */}
-      {liveMatches.length > 0 && (
+      {liveMatches && liveMatches.length > 0 && (
         <div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

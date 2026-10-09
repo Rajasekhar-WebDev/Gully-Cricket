@@ -1,33 +1,50 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { matchApi } from '../services/api';
+import { fastCache } from '../services/fastCache';
 import { useSound } from '../context/SoundContext';
 import MatchCard from '../components/cricket/MatchCard';
-import LoadingSpinner from '../components/common/LoadingSpinner';
 import ErrorAlert from '../components/common/ErrorAlert';
 import ConfirmationModal from '../components/common/ConfirmationModal';
-import { PlusCircle, Search, Trophy, Filter } from 'lucide-react';
+import { PlusCircle, Search, Trophy, RefreshCw } from 'lucide-react';
 
 const Matches = () => {
-  const [matches, setMatches] = useState([]);
   const [filterStatus, setFilterStatus] = useState('ALL');
+  const cached = fastCache.get(`gulli_matches_${filterStatus}`, []);
+
+  const [matches, setMatches] = useState(cached || []);
   const [searchQuery, setSearchQuery] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(cached.length === 0);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [error, setError] = useState('');
   const [deleteModalMatch, setDeleteModalMatch] = useState(null);
 
   const { playSound } = useSound();
 
-  const fetchMatches = async (status = filterStatus) => {
-    try {
+  const fetchMatches = async (status = filterStatus, isManual = false) => {
+    const cachedForStatus = fastCache.get(`gulli_matches_${status}`, []);
+    if (cachedForStatus.length > 0 && !isManual) {
+      setMatches(cachedForStatus);
+      setLoading(false);
+    } else {
       setLoading(true);
+    }
+
+    if (isManual) setIsSyncing(true);
+
+    try {
       setError('');
       const data = await matchApi.getAll(status === 'ALL' ? undefined : status);
-      setMatches(data);
+      const list = data || [];
+      fastCache.set(`gulli_matches_${status}`, list);
+      setMatches(list);
     } catch (err) {
-      setError('Failed to load matches: ' + err.message);
+      if (matches.length === 0) {
+        setError('Failed to load matches: ' + err.message);
+      }
     } finally {
       setLoading(false);
+      setIsSyncing(false);
     }
   };
 
@@ -41,7 +58,7 @@ const Matches = () => {
       playSound('tap');
       await matchApi.delete(deleteModalMatch.id);
       setDeleteModalMatch(null);
-      fetchMatches(filterStatus);
+      fetchMatches(filterStatus, true);
     } catch (err) {
       setError('Failed to delete match: ' + err.message);
     }
@@ -76,18 +93,29 @@ const Matches = () => {
           </p>
         </div>
 
-        <Link
-          to="/match/new"
-          className="btn btn-primary"
-          style={{ padding: '10px 20px' }}
-          onClick={() => playSound('tap')}
-        >
-          <PlusCircle size={18} />
-          <span>New Match</span>
-        </Link>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button
+            onClick={() => fetchMatches(filterStatus, true)}
+            disabled={isSyncing}
+            className="btn btn-secondary"
+            title="Refresh latest match list"
+            style={{ padding: '10px 14px' }}
+          >
+            <RefreshCw size={16} className={isSyncing ? 'spinner' : ''} />
+          </button>
+          <Link
+            to="/match/new"
+            className="btn btn-primary"
+            style={{ padding: '10px 20px' }}
+            onClick={() => playSound('tap')}
+          >
+            <PlusCircle size={18} />
+            <span>New Match</span>
+          </Link>
+        </div>
       </div>
 
-      <ErrorAlert message={error} onDismiss={() => setError('')} retry={() => fetchMatches(filterStatus)} />
+      <ErrorAlert message={error} onDismiss={() => setError('')} retry={() => fetchMatches(filterStatus, true)} />
 
       {/* Filter and Search Bar */}
       <div style={{
@@ -108,15 +136,15 @@ const Matches = () => {
               key={s.key}
               onClick={() => { playSound('tap'); setFilterStatus(s.key); }}
               className={`btn ${filterStatus === s.key ? 'btn-primary' : 'btn-secondary'}`}
-              style={{ padding: '7px 14px', fontSize: '0.85rem' }}
+              style={{ padding: '8px 16px', fontSize: '0.85rem' }}
             >
               {s.label}
             </button>
           ))}
         </div>
 
-        {/* Search Input */}
-        <div style={{ position: 'relative', minWidth: '240px' }}>
+        {/* Search */}
+        <div style={{ position: 'relative', width: '100%', maxWidth: '320px' }}>
           <Search size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
           <input
             type="text"
@@ -129,8 +157,12 @@ const Matches = () => {
       </div>
 
       {/* Match Cards Grid */}
-      {loading ? (
-        <LoadingSpinner message="Filtering matches..." />
+      {loading && matches.length === 0 ? (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '20px' }}>
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="skeleton-box" style={{ height: '220px' }} />
+          ))}
+        </div>
       ) : filteredMatches.length > 0 ? (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '20px' }}>
           {filteredMatches.map((m) => (

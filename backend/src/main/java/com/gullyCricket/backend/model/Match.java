@@ -1,6 +1,7 @@
 package com.gullyCricket.backend.model;
 
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
@@ -15,11 +16,13 @@ public class Match {
     private String teamB;
     private String teamAId;
     private String teamBId;
+    @Indexed
     private String createdBy;
     private String createdByName;
     private int totalOvers = 10;
     private String matchDate;
     private String location;
+    @Indexed
     private String status = "UPCOMING"; // UPCOMING, TOSS_DONE, LIVE, INNINGS_BREAK, COMPLETED
     private String tossWinner;
     private String tossDecision; // BAT, BOWL
@@ -42,6 +45,7 @@ public class Match {
     private String scoreSummaryTeamA;
     private String scoreSummaryTeamB;
 
+    @Indexed
     private Instant createdAt = Instant.now();
     private Instant updatedAt = Instant.now();
 

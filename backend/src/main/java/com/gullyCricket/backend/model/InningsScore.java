@@ -1,6 +1,7 @@
 package com.gullyCricket.backend.model;
 
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.util.ArrayList;
@@ -10,6 +11,7 @@ import java.util.List;
 public class InningsScore {
     @Id
     private String id;
+    @Indexed
     private String matchId;
     private int inningsNumber; // 1 or 2
     private String battingTeam;

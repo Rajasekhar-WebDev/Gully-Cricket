@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { teamApi } from '../services/api';
+import { fastCache } from '../services/fastCache';
 import { useAuth } from '../context/AuthContext';
 import { useSound } from '../context/SoundContext';
 import LoadingSpinner from '../components/common/LoadingSpinner';
@@ -9,8 +10,9 @@ import ConfirmationModal from '../components/common/ConfirmationModal';
 import { Shield, Plus, Edit2, Trash2, Users, Trophy, ArrowRight, Check } from 'lucide-react';
 
 const Teams = () => {
-  const [teams, setTeams] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const cached = fastCache.get('gulli_teams_list', []);
+  const [teams, setTeams] = useState(cached || []);
+  const [loading, setLoading] = useState(cached.length === 0);
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -31,12 +33,16 @@ const Teams = () => {
 
   const fetchTeams = async () => {
     try {
-      setLoading(true);
+      if (teams.length === 0) setLoading(true);
       setError('');
       const data = await teamApi.getAll();
-      setTeams(data);
+      const list = data || [];
+      fastCache.set('gulli_teams_list', list);
+      setTeams(list);
     } catch (err) {
-      setError('Failed to load teams: ' + err.message);
+      if (teams.length === 0) {
+        setError('Failed to load teams: ' + err.message);
+      }
     } finally {
       setLoading(false);
     }

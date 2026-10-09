@@ -9,6 +9,8 @@ import java.util.List;
 @Repository
 public interface MatchRepository extends MongoRepository<Match, String> {
     List<Match> findAllByOrderByCreatedAtDesc();
+    List<Match> findTop5ByOrderByCreatedAtDesc();
     List<Match> findByStatusOrderByCreatedAtDesc(String status);
+    List<Match> findTop5ByStatusOrderByCreatedAtDesc(String status);
     long countByStatus(String status);
 }
